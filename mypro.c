@@ -15,16 +15,20 @@ typedef struct tuple
 
 int linear_select();
 int tpmms(int rstart, int rfinish, int wstart);
-int index_select();
+int index_select(int rstart, int rfinish, int index_start, int result_start);
 int relation_projection();
 int sort_merge_join();
 int two_scan();
 int read_tuple(unsigned char *blk, int num);
 void write_tuple(unsigned char *blk, int num);
-// void clear_blk(unsigned char *blk, int blk_size);
-unsigned char *getNewBlockInBuffer_clear(Buffer *buf);
+
 int cmp(const void *a, const void *b);
+
 int find_min_position(unsigned char *blk);
+int create_index(int rstart, int rfinish, int index_start, Buffer *buf);
+
+unsigned char *getNewBlockInBuffer_clear(Buffer *buf);
+int linear_select_search(int search_start, int search_finish, int wfinish, Buffer *buf);
 
 T tuple_value;
 
@@ -32,8 +36,10 @@ int main(int argc, char **argv)
 {
   // printf("hello world\n");
   // linear_select();
-  linear_select();
   // tpmms(17,48,317);
+  index_select(301, 316, 501, 601);
+  // index_select(301, 316, 501);
+  // index_select(317, 348, 517, 600);
   getchar();
   return 0;
 }
@@ -41,8 +47,8 @@ int main(int argc, char **argv)
 int linear_select()
 {
   Buffer buf;
-  unsigned char *blk;
-  unsigned char *wblk;
+  // unsigned char *blk;
+  // unsigned char *wblk;
   int m = 1;
   int write_disk_num = 100;
 
@@ -52,62 +58,64 @@ int linear_select()
     return -1;
   }
 
-  wblk = getNewBlockInBuffer_clear(&buf);
+  linear_select_search(1, 16, 100, &buf);
 
-  for (int i = 1; i <= 16; i++)
-  {
-    if ((blk = readBlockFromDisk(i, &buf)) == NULL)
-    {
-      perror("Reading Block Failed!\n");
-      return -1;
-    }
-    else
-    {
-      printf("读入数据块%d\n", i);
+  // wblk = getNewBlockInBuffer_clear(&buf);
 
-      for (int j = 1; j <= 7;j++)
-      {
-        read_tuple(blk, j);
-        // printf("%d, %d\n", tuple_value.x, tuple_value.y);
-        if(tuple_value.x == 30)
-        {
-          //一个内存块存满了，先把他写入磁盘
-          if(m > 7)
-          {
-            m = 1;
-            tuple_value.x = write_disk_num + 1;
-            tuple_value.y = 0;
-            write_tuple(wblk, 8);
-            if (writeBlockToDisk(wblk, write_disk_num, &buf) != 0)
-            {
-              perror("Writing Block Failed!\n");
-              return -1;
-            }
-            printf("注：结果写入磁盘%d\n", write_disk_num);
-            write_disk_num++;
-            // freeBlockInBuffer(wblk, &buf);
-            wblk = getNewBlockInBuffer_clear(&buf);
-          }
-          printf("(X=%d, Y=%d)\n", tuple_value.x, tuple_value.y);
-          write_tuple(wblk, m);
-          m++;
-        }
-      }
-      freeBlockInBuffer(blk, &buf);
-    }
-  }
-  //结果写入磁盘
-  tuple_value.x = write_disk_num + 1;
-  tuple_value.y = 0;
-  write_tuple(wblk, 8);
-  if (writeBlockToDisk(wblk, write_disk_num, &buf) != 0)
-  {
-    perror("Writing Block Failed!\n");
-    return -1;
-  }
-  printf("注：结果写入磁盘%d\n", write_disk_num);
-  // freeBlockInBuffer(wblk, &buf);
+  // for (int i = 1; i <= 16; i++)
+  // {
+  //   if ((blk = readBlockFromDisk(i, &buf)) == NULL)
+  //   {
+  //     perror("Reading Block Failed!\n");
+  //     return -1;
+  //   }
+  //   else
+  //   {
+  //     printf("读入数据块%d\n", i);
 
+  //     for (int j = 1; j <= 7;j++)
+  //     {
+  //       read_tuple(blk, j);
+  //       // printf("%d, %d\n", tuple_value.x, tuple_value.y);
+  //       if(tuple_value.x == 30)
+  //       {
+  //         //一个内存块存满了，先把他写入磁盘
+  //         if(m > 7)
+  //         {
+  //           m = 1;
+  //           tuple_value.x = write_disk_num + 1;
+  //           tuple_value.y = 0;
+  //           write_tuple(wblk, 8);
+  //           if (writeBlockToDisk(wblk, write_disk_num, &buf) != 0)
+  //           {
+  //             perror("Writing Block Failed!\n");
+  //             return -1;
+  //           }
+  //           printf("注：结果写入磁盘%d\n", write_disk_num);
+  //           write_disk_num++;
+  //           // freeBlockInBuffer(wblk, &buf);
+  //           wblk = getNewBlockInBuffer_clear(&buf);
+  //         }
+  //         printf("(X=%d, Y=%d)\n", tuple_value.x, tuple_value.y);
+  //         write_tuple(wblk, m);
+  //         m++;
+  //       }
+  //     }
+  //     freeBlockInBuffer(blk, &buf);
+  //   }
+  // }
+  // //结果写入磁盘
+  // tuple_value.x = write_disk_num + 1;
+  // tuple_value.y = 0;
+  // write_tuple(wblk, 8);
+  // if (writeBlockToDisk(wblk, write_disk_num, &buf) != 0)
+  // {
+  //   perror("Writing Block Failed!\n");
+  //   return -1;
+  // }
+  // printf("注：结果写入磁盘%d\n", write_disk_num);
+  // // freeBlockInBuffer(wblk, &buf);
+  // printf("共发生%d次I/O\n", buf.numIO);
   //释放内存
   freeBuffer(&buf);
 }
@@ -299,9 +307,83 @@ STEP7:
   freeBuffer(&buf);
 }
 
-int index_select()
+int index_select(int rstart, int rfinish, int index_start, int result_start)
 {
+  Buffer buf;
+  unsigned char *blk;
+  int index_finish;
 
+  //目的是从索引中找到start_blk和finish_blk
+  int start_blk;
+  int finish_blk;
+
+  int start_find = 0;
+  // int index = 1;
+  T last_tuple;
+
+  if (!initBuffer(520, 64, &buf))
+  {
+    perror("Buffer Initialization Failed!\n");
+    return -1;
+  }
+
+  index_finish = create_index(rstart, rfinish, index_start, &buf);
+
+  buf.numIO = 0;
+
+  for (; index_start <= index_finish; index_start++)
+  {
+    printf("读入索引文件%d\n", index_start);
+    if ((blk = readBlockFromDisk(index_start, &buf)) == NULL)
+    {
+      perror("Reading Block Failed!\n");
+      return -1;
+    }
+    for (int i = 1; i <= 7; i++)
+    {
+      read_tuple(blk, i);
+
+      if(tuple_value.x == 30)
+      {
+        if(start_find == 0)
+        {
+          start_blk = last_tuple.y;
+          finish_blk = last_tuple.y;
+          start_find = 1;
+        }
+        else
+        {
+          finish_blk = tuple_value.y;
+        }
+      }
+      else if(tuple_value.x > 30)
+      {
+        if(start_find == 0)
+        {
+          start_blk = last_tuple.y;
+          finish_blk = last_tuple.y;
+          start_find = 1;
+        }
+        else
+        {
+          finish_blk = last_tuple.y;
+        }
+        goto FINDFROMBLK;
+      }
+      else
+      {
+        
+      }
+      last_tuple.x = tuple_value.x;
+      last_tuple.y = tuple_value.y;
+    }
+  }
+
+FINDFROMBLK:
+
+  printf("从索引中得知需要的值开始磁盘块为%d，结束磁盘块为%d\n", start_blk, finish_blk);
+  linear_select_search(start_blk, finish_blk, result_start, &buf);
+  freeBuffer(&buf);
 }
 
 int relation_projection()
@@ -446,4 +528,131 @@ int find_min_position(unsigned char *blk)
     }
   }
   return min_position;
+}
+
+int create_index(int rstart, int rfinish, int index_start, Buffer *buf)
+{
+  unsigned char *blk;
+  unsigned char *wblk;
+  int index = 1;
+  int index_finish = index_start;
+
+
+  wblk = getNewBlockInBuffer_clear(buf);
+
+  // printf("从%d磁盘块开始建立索引直到");
+  for (; rstart <= rfinish; rstart++)
+  {
+    if ((blk = readBlockFromDisk(rstart, buf)) == NULL)
+    {
+      perror("Reading Block Failed!\n");
+      return -1;
+    }
+    read_tuple(blk, 1);
+    tuple_value.y = rstart;
+    write_tuple(wblk, index);
+    index++;
+    if(index == 8)
+    {
+      tuple_value.x = index_finish + 1;
+      tuple_value.y = 0;
+      write_tuple(wblk, index);
+
+      index = 1;
+      if (writeBlockToDisk(wblk, index_finish, buf) != 0)
+      {
+        perror("Writing Block Failed!\n");
+        return -1;
+      }
+      wblk = getNewBlockInBuffer_clear(buf);
+      index_finish++;
+    }
+    freeBlockInBuffer(blk, buf);
+  }
+  if(index != 1)
+  {
+    tuple_value.x = index_finish + 1;
+    tuple_value.y = 0;
+    write_tuple(wblk, 8);
+    if (writeBlockToDisk(wblk, index_finish, buf) != 0)
+    {
+      perror("Writing Block Failed!\n");
+      return -1;
+    }
+    index_finish++;
+  }
+  else
+  {
+    freeBlockInBuffer(wblk, buf);
+  }
+  printf("从%d磁盘块开始建立索引直到%d块\n", index_start, index_finish-1);
+  return index_finish - 1;
+}
+
+int linear_select_search(int search_start, int search_finish, int wfinish, Buffer *buf)
+{
+  unsigned char *blk;
+  unsigned char *wblk;
+  int m = 1;
+  int find_result_num = 0;
+
+  wblk = getNewBlockInBuffer_clear(buf);
+
+  for (int i = search_start; i <= search_finish; i++)
+  {
+    if ((blk = readBlockFromDisk(i, buf)) == NULL)
+    {
+      perror("Reading Block Failed!\n");
+      return -1;
+    }
+    else
+    {
+      printf("读入数据块%d\n", i);
+
+      for (int j = 1; j <= 7;j++)
+      {
+        read_tuple(blk, j);
+        // printf("%d, %d\n", tuple_value.x, tuple_value.y);
+        if(tuple_value.x == 30)
+        {
+          find_result_num++;
+          //一个内存块存满了，先把他写入磁盘
+          if(m > 7)
+          {
+            m = 1;
+            tuple_value.x = wfinish + 1;
+            tuple_value.y = 0;
+            write_tuple(wblk, 8);
+            if (writeBlockToDisk(wblk, wfinish, buf) != 0)
+            {
+              perror("Writing Block Failed!\n");
+              return -1;
+            }
+            printf("注：结果写入磁盘%d\n", wfinish);
+            wfinish++;
+            // freeBlockInBuffer(wblk, &buf);
+            wblk = getNewBlockInBuffer_clear(buf);
+          }
+          printf("(X=%d, Y=%d)\n", tuple_value.x, tuple_value.y);
+          write_tuple(wblk, m);
+          m++;
+        }
+      }
+      freeBlockInBuffer(blk, buf);
+    }
+  }
+  //结果写入磁盘
+  tuple_value.x = wfinish + 1;
+  tuple_value.y = 0;
+  write_tuple(wblk, 8);
+  if (writeBlockToDisk(wblk, wfinish, buf) != 0)
+  {
+    perror("Writing Block Failed!\n");
+    return -1;
+  }
+  printf("注：结果写入磁盘%d\n", wfinish);
+  printf("满足条件的元组一共有%d个\n", find_result_num);
+  printf("I/O读写一共%d次\n", buf->numIO);
+
+  return 0;
 }
