@@ -15,7 +15,7 @@ typedef struct tuple
 
 int linear_select();
 int tpmms(int rstart, int rfinish, int wstart);
-int index_select(int rstart, int rfinish, int index_start, int result_start);
+int index_select(int rstart, int rfinish, int index_start, int index_finish, int result_start, int search);
 int relation_projection();
 int sort_merge_join();
 int two_scan();
@@ -37,9 +37,8 @@ int main(int argc, char **argv)
   // printf("hello world\n");
   // linear_select();
   // tpmms(17,48,317);
-  index_select(301, 316, 501, 601);
-  // index_select(301, 316, 501);
-  // index_select(317, 348, 517, 600);
+  index_select(301, 316, 501, 0, 601, 1);
+  // index_select(317, 348, 517, 0, 617, 0);
   getchar();
   return 0;
 }
@@ -307,12 +306,12 @@ STEP7:
   freeBuffer(&buf);
 }
 
-int index_select(int rstart, int rfinish, int index_start, int result_start)
+int index_select(int rstart, int rfinish, int index_start, int index_finish, int result_start, int search)
 {
   Buffer buf;
   unsigned char *blk;
-  int index_finish;
-
+  // int index_finish;
+  int find_blk_finish = 0;
   //目的是从索引中找到start_blk和finish_blk
   int start_blk;
   int finish_blk;
@@ -327,62 +326,80 @@ int index_select(int rstart, int rfinish, int index_start, int result_start)
     return -1;
   }
 
-  index_finish = create_index(rstart, rfinish, index_start, &buf);
-
-  buf.numIO = 0;
-
-  for (; index_start <= index_finish; index_start++)
+  if(index_finish == 0)
   {
-    printf("读入索引文件%d\n", index_start);
-    if ((blk = readBlockFromDisk(index_start, &buf)) == NULL)
-    {
-      perror("Reading Block Failed!\n");
-      return -1;
-    }
-    for (int i = 1; i <= 7; i++)
-    {
-      read_tuple(blk, i);
-
-      if(tuple_value.x == 30)
-      {
-        if(start_find == 0)
-        {
-          start_blk = last_tuple.y;
-          finish_blk = last_tuple.y;
-          start_find = 1;
-        }
-        else
-        {
-          finish_blk = tuple_value.y;
-        }
-      }
-      else if(tuple_value.x > 30)
-      {
-        if(start_find == 0)
-        {
-          start_blk = last_tuple.y;
-          finish_blk = last_tuple.y;
-          start_find = 1;
-        }
-        else
-        {
-          finish_blk = last_tuple.y;
-        }
-        goto FINDFROMBLK;
-      }
-      else
-      {
-        
-      }
-      last_tuple.x = tuple_value.x;
-      last_tuple.y = tuple_value.y;
-    }
+    index_finish = create_index(rstart, rfinish, index_start, &buf);
   }
 
-FINDFROMBLK:
+  if(search == 1)
+  {
+    buf.numIO = 0;
 
-  printf("从索引中得知需要的值开始磁盘块为%d，结束磁盘块为%d\n", start_blk, finish_blk);
-  linear_select_search(start_blk, finish_blk, result_start, &buf);
+    for (; index_start <= index_finish; index_start++)
+    {
+      printf("读入索引文件%d\n", index_start);
+      if ((blk = readBlockFromDisk(index_start, &buf)) == NULL)
+      {
+        perror("Reading Block Failed!\n");
+        return -1;
+      }
+      for (int i = 1; i <= 7; i++)
+      {
+        read_tuple(blk, i);
+
+        if(tuple_value.x == 30)
+        {
+          if(start_find == 0)
+          {
+            start_blk = last_tuple.y;
+            finish_blk = last_tuple.y;
+            start_find = 1;
+          }
+          else
+          {
+            finish_blk = tuple_value.y;
+          }
+        }
+        else if(tuple_value.x > 30)
+        {
+          if(start_find == 0)
+          {
+            start_blk = last_tuple.y;
+            finish_blk = last_tuple.y;
+            start_find = 1;
+          }
+          else
+          {
+            finish_blk = last_tuple.y;
+          }
+          find_blk_finish = 1;
+        }
+        else
+        {
+          
+        }
+        if(find_blk_finish == 1)
+        {
+          break;
+        }
+        last_tuple.x = tuple_value.x;
+        last_tuple.y = tuple_value.y;
+      }
+      if(find_blk_finish == 1)
+      {
+        break;
+      }
+    }
+
+    if(start_find == 0)
+    {
+      start_blk = rfinish;
+      finish_blk = rfinish;
+    }
+
+    printf("从索引中得知需要的值开始磁盘块为%d，结束磁盘块为%d\n", start_blk, finish_blk);
+    linear_select_search(start_blk, finish_blk, result_start, &buf);
+  }
   freeBuffer(&buf);
 }
 
