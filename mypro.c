@@ -16,7 +16,7 @@ typedef struct tuple
 int linear_select();
 int tpmms(int rstart, int rfinish, int wstart);
 int index_select(int rstart, int rfinish, int index_start, int index_finish, int result_start, int search);
-int relation_projection();
+int relation_projection(int sort_start, int sort_finish, int result_start);
 int sort_merge_join();
 int two_scan();
 int read_tuple(unsigned char *blk, int num);
@@ -36,15 +36,19 @@ int main(int argc, char **argv)
 {
   // printf("hello world\n");
   // linear_select();
-  tpmms(17,48,317);
+  // tpmms(17,48,317);
   // index_select(301, 316, 501, 0, 601, 1);
   // index_select(317, 348, 517, 0, 617, 0);
+
+  relation_projection(301, 316, 701);
+
   getchar();
   return 0;
 }
 
 int linear_select()
 {
+  printf("----------基于线性搜索的关系选择----------\n\n");
   Buffer buf;
   // unsigned char *blk;
   // unsigned char *wblk;
@@ -121,6 +125,7 @@ int linear_select()
 
 int tpmms(int rstart, int rfinish, int wstart)
 {
+  printf("----------两阶段多路归并排序----------\n\n");
   Buffer buf;
   unsigned char *blk;
   T tuples[SUMTUPLE];
@@ -310,6 +315,7 @@ int tpmms(int rstart, int rfinish, int wstart)
 
 int index_select(int rstart, int rfinish, int index_start, int index_finish, int result_start, int search)
 {
+  printf("----------基于索引的选择算法----------\n\n");
   Buffer buf;
   unsigned char *blk;
   // int index_finish;
@@ -405,10 +411,119 @@ int index_select(int rstart, int rfinish, int index_start, int index_finish, int
   freeBuffer(&buf);
 }
 
-int relation_projection()
+int relation_projection(int sort_start, int sort_finish, int result_start)
 {
+	printf("----------基于排序的投影算法（去重）----------\n\n");
+  Buffer buf;
+  if (!initBuffer(520, 64, &buf))
+  {
+    perror("Buffer Initialization Failed!\n");
+    return -1;
+  }
+  unsigned char *blks[buf.numAllBlk - 1];
+  unsigned char *wblk;
+  int first_read = 1;
+  int m;
+  int blk_index = 0;
+  int temp;
+  int wblk_index = 1;
+  int result_finish = result_start;
+  int count = 0;
+  wblk = getNewBlockInBuffer_clear(&buf);
 
+  m = (sort_finish - sort_start) / (buf.numAllBlk - 1) + 1;
+  for (int i = 1; i <= m; i++)
+  {
+    for (blk_index = 0; blk_index < buf.numAllBlk - 1; blk_index++)
+    {
+      if ((blks[blk_index] = readBlockFromDisk(sort_start, &buf)) == NULL)
+			{
+				perror("Reading R-Block Failed!\n");
+				return -1;
+			}
+      sort_start++;
+      if(sort_start == sort_finish + 1)
+      {
+        sort_start--;
+        blk_index++;
+        break;
+      }
+    }
+
+    if(i == 1)
+    {
+      printf("读入数据块%d\n", sort_start - blk_index);
+      read_tuple(blks[0], 1);
+      temp = tuple_value.x;
+      tuple_value.y = 0;
+      write_tuple(wblk, wblk_index);
+      printf("(X=%d)\n", temp);
+      wblk_index++;
+      count++;
+    }
+    for (int j = 0; j < blk_index; j++)
+    {
+      //一块写7个
+      if(first_read == 0)
+      {
+        printf("读入数据块%d\n", sort_start + j - blk_index);
+      }
+      first_read = 0;
+      for (int k = 0; k < 7; k++)
+      {
+        read_tuple(blks[j], k+1);
+        if(temp != tuple_value.x)
+        {
+          count++;
+          temp = tuple_value.x;
+          tuple_value.y = 0;
+          write_tuple(wblk, wblk_index);
+          printf("(X=%d)\n", temp);
+          wblk_index++;
+          if(wblk_index == 8)
+          {
+            tuple_value.x = result_finish + 1;
+            tuple_value.y = 0;
+            write_tuple(wblk, 8);
+            wblk_index = 1;
+            if (writeBlockToDisk(wblk, result_finish, &buf) != 0)
+            {
+              perror("Writing Block Failed!\n");
+              return -1;
+            }
+            wblk = getNewBlockInBuffer_clear(&buf);
+            result_finish++;
+          }
+        }
+
+      }
+    }
+    for (int j = 0; j < blk_index; j++)
+    {
+      freeBlockInBuffer(blks[j], &buf);
+    }
+  }
+  if(wblk_index != 1)
+  {
+    tuple_value.x = result_finish + 1;
+    tuple_value.y = 0;
+    write_tuple(wblk, 8);
+    wblk_index = 1;
+    if (writeBlockToDisk(wblk, result_finish, &buf) != 0)
+    {
+      perror("Writing Block Failed!\n");
+      return -1;
+    }
+    wblk = getNewBlockInBuffer_clear(&buf);
+    result_finish++;
+  }
+
+
+  printf("注：结果从磁盘%d写到磁盘%d\n", result_start, result_finish - 1);
+  printf("满足投影去重的属性值一共%d个\n", count);
+  printf("I/O读写一共%d次\n", buf.numIO);
 }
+
 
 int sort_merge_join()
 {
