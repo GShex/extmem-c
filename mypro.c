@@ -17,7 +17,7 @@ int linear_select();
 int tpmms(int rstart, int rfinish, int wstart);
 int index_select(int rstart, int rfinish, int index_start, int index_finish, int result_start, int search);
 int relation_projection(int sort_start, int sort_finish, int result_start);
-int sort_merge_join();
+int sort_merge_join(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sort_finish, int result_start);
 int two_scan();
 int read_tuple(unsigned char *blk, int num);
 void write_tuple(unsigned char *blk, int num);
@@ -40,8 +40,8 @@ int main(int argc, char **argv)
   // index_select(301, 316, 501, 0, 601, 1);
   // index_select(317, 348, 517, 0, 617, 0);
 
-  relation_projection(301, 316, 701);
-
+  // relation_projection(301, 316, 701);
+  sort_merge_join(301, 316, 317, 348, 1000);
   getchar();
   return 0;
 }
@@ -313,6 +313,8 @@ int tpmms(int rstart, int rfinish, int wstart)
   freeBuffer(&buf);
 }
 
+//index_finish为0则表示还没有建立索引，从index_start开始建立索引，否则不用建立索引
+//seach用于标记是否搜索，为1则搜索（即R关系），否则不用（即S关系）
 int index_select(int rstart, int rfinish, int index_start, int index_finish, int result_start, int search)
 {
   printf("----------基于索引的选择算法----------\n\n");
@@ -522,12 +524,170 @@ int relation_projection(int sort_start, int sort_finish, int result_start)
   printf("注：结果从磁盘%d写到磁盘%d\n", result_start, result_finish - 1);
   printf("满足投影去重的属性值一共%d个\n", count);
   printf("I/O读写一共%d次\n", buf.numIO);
+  freeBuffer(&buf);
 }
 
 
-int sort_merge_join()
+int sort_merge_join(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sort_finish, int result_start)
 {
+  printf("----------基于排序的连接操作算法----------\n\n");
+  Buffer buf;
+  if (!initBuffer(520, 64, &buf))
+  {
+    perror("Buffer Initialization Failed!\n");
+    return -1;
+  }
 
+  unsigned char *blk_R;
+  unsigned char *blk_S;
+  unsigned char *wblk;
+
+  int first = 1;
+  int blk_R_number = R_sort_start;
+  int blk_R_index = 1;
+  int finish = 0;
+  int last_value_S = 0;
+  int now_blk_R_number;
+  int result_finish = result_start;
+  int save_blk_R_number;
+  int save_blk_R_index;
+  T value_S;
+  T value_R;
+  int wblk_index = 1;
+  //用于写的内存块
+  wblk = getNewBlockInBuffer_clear(&buf);
+
+  for (; S_sort_start <= S_sort_finish;S_sort_start++)
+  {
+    if ((blk_S = readBlockFromDisk(S_sort_start, &buf)) == NULL)
+    {
+      perror("Reading R-Block Failed!\n");
+      return -1;
+    }
+    //对S每一块的七个值
+    for (i = 1; i <= 7; i++)
+    {
+      read_tuple(blk_S, i);
+      if(first == 1)
+      {
+        last_value_S = tuple_value.x;
+        first = 0;
+      }
+      value_S.x = tuple_value.x;
+      value_S.y = tuple_value.y;
+      //最后一块可能有空白，读到的值为0就退出去即结束了
+      if(value_S.x != 0)
+      {
+        if(value_S.x == last_value_S)
+        {
+          now_blk_R_number = blk_R_number;
+          j_blk_R_index = blk_R_index;
+          while(now_blk_R_number<=R_sort_finish && value_R.x == value_S.x)
+          {
+            if ((blk_R = readBlockFromDisk(now_blk_R_number, &buf)) == NULL)
+            {
+              perror("Reading R-Block Failed!\n");
+              return -1;
+            }
+            for (j = j_blk_R_index; j <= 7;j++)
+            {
+              read_tuple(blk_S, i);
+              value_R.x = tuple_value.x;
+              value_R.y = tuple_value.y;
+              if(value_R.x == value_S.x)
+              {
+                // 写入wblk；
+                tuple_value.x = value_S.x;
+                tuple_value.y = value_S.y;
+                write_tuple(wblk, wblk_index);
+                wblk_index++;
+                if(wblk_index == 8)
+                {
+                  wblk_index = 1;
+                  tuple_value.x = result_finish + 1;
+                  tuple_value.y = 0;
+                  if (writeBlockToDisk(wblk, result_finish, &buf) != 0)
+                  {
+                    perror("Writing Block Failed!\n");
+                    return -1;
+                  }
+                  wblk = getNewBlockInBuffer_clear(&buf);
+                  result_finish++;
+                }
+                tuple_value.x = value_R.x;
+                tuple_value.y = value_R.y;
+                write_tuple(wblk, wblk_index);
+                wblk_index++;
+                if(wblk_index == 8)
+                {
+                  wblk_index = 1;
+                  tuple_value.x = result_finish + 1;
+                  tuple_value.y = 0;
+                  if (writeBlockToDisk(wblk, result_finish, &buf) != 0)
+                  {
+                    perror("Writing Block Failed!\n");
+                    return -1;
+                  }
+                  wblk = getNewBlockInBuffer_clear(&buf);
+                  result_finish++;
+                }
+              }
+              else
+              {
+                break;
+              }
+            }
+            save_blk_R_number = now_blk_R_number;
+            save_blk_R_index = j_blk_R_index;
+            now_blk_R_number++;
+            j_blk_R_index = 1;
+            freeBlockInBuffer(blk_R, &buf);
+          }
+        }
+        else//value_S.x != last_value_S
+        {
+          now_blk_R_number = blk_R_number;
+          j_blk_R_index = blk_R_index;
+          while(now_blk_R_number<=R_sort_finish && value_R.x < value_S.x)
+          {
+            if ((blk_R = readBlockFromDisk(now_blk_R_number, &buf)) == NULL)
+            {
+              perror("Reading R-Block Failed!\n");
+              return -1;
+            }
+            for (j = j_blk_R_index; j <= 7;j++)
+            {
+              read_tuple(blk_S, i);
+              value_R.x = tuple_value.x;
+              value_R.y = tuple_value.y;
+              if(value_R.x >= value_S.x)
+              {
+                break;
+              }
+            }
+            save_blk_R_number = now_blk_R_number;
+            save_blk_R_index = j_blk_R_index;
+            now_blk_R_number++;
+            j_blk_R_index = 1;
+            freeBlockInBuffer(blk_R, &buf);
+          }
+          if(value_R.x == value_S.x)
+          {
+            blk_R_number = save_blk_R_number;
+            blk_R_index = save_blk_R_index;
+          }
+          else//value_R.x > value_S.x
+          {
+            continue;
+          }
+        }
+        last_value_S = value_S.x;
+      }
+    }
+    freeBlockInBuffer(blk_S, &buf);
+  }
+
+  freeBuffer(&buf);
 }
 
 int two_scan()
@@ -762,10 +922,10 @@ int linear_select_search(int search_start, int search_finish, int wfinish, Buffe
               perror("Writing Block Failed!\n");
               return -1;
             }
+            wblk = getNewBlockInBuffer_clear(buf);
             printf("注：结果写入磁盘%d\n", wfinish);
             wfinish++;
             // freeBlockInBuffer(wblk, &buf);
-            wblk = getNewBlockInBuffer_clear(buf);
           }
           printf("(X=%d, Y=%d)\n", tuple_value.x, tuple_value.y);
           write_tuple(wblk, m);
