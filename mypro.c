@@ -36,8 +36,8 @@ int main(int argc, char **argv)
 {
   // printf("hello world\n");
   // linear_select();
-  // tpmms(17,48,317);
-  index_select(301, 316, 501, 0, 601, 1);
+  tpmms(17,48,317);
+  // index_select(301, 316, 501, 0, 601, 1);
   // index_select(317, 348, 517, 0, 617, 0);
   getchar();
   return 0;
@@ -244,63 +244,65 @@ int tpmms(int rstart, int rfinish, int wstart)
   }
   p_output = 1;
 
-STEP7:
-
-  min_position = find_min_position(compare_blk);
-  min_value = read_tuple(compare_blk, min_position);
-  //都不是finished即找到了最小值
-  if(min_value != FINISHED)
+  while(1)
   {
-    write_tuple(output_blk, p_output);
-    p_output++;
-    if(p_output == 8)
+    min_position = find_min_position(compare_blk);
+    min_value = read_tuple(compare_blk, min_position);
+    //都不是finished即找到了最小值
+    if(min_value != FINISHED)
     {
-      tuple_value.x = wstart + 1;
-      tuple_value.y = 0;
-      write_tuple(output_blk, 8);
-      if (writeBlockToDisk(output_blk, wstart, &buf) != 0)
+      write_tuple(output_blk, p_output);
+      p_output++;
+      if(p_output == 8)
       {
-        perror("Writing Block Failed!\n");
-        return -1;
+        tuple_value.x = wstart + 1;
+        tuple_value.y = 0;
+        write_tuple(output_blk, 8);
+        if (writeBlockToDisk(output_blk, wstart, &buf) != 0)
+        {
+          perror("Writing Block Failed!\n");
+          return -1;
+        }
+        output_blk = getNewBlockInBuffer_clear(&buf);
+        wstart++;
+        p_output = 1;
       }
-      output_blk = getNewBlockInBuffer_clear(&buf);
-      wstart++;
-      p_output = 1;
-    }
-    read_tuple(sort_blks[min_position], sort_blks_i[min_position]);
-    sort_blks_i[min_position]++;
-    //Mi有下一个元素
-    if(tuple_value.x != 0 && (sort_blks_i[min_position]-1) <= 7)
-    {
-      write_tuple(compare_blk, min_position);
-      goto STEP7;
+      read_tuple(sort_blks[min_position], sort_blks_i[min_position]);
+      sort_blks_i[min_position]++;
+      //Mi有下一个元素
+      if(tuple_value.x != 0 && (sort_blks_i[min_position]-1) <= 7)
+      {
+        write_tuple(compare_blk, min_position);
+      }
+      else
+      {
+        // Si有下一块
+        if ((sposition[min_position] - (rstart-1)) % (buf.numAllBlk - 1) != 0 && sposition[min_position] != rfinish)
+        {
+          freeBlockInBuffer(sort_blks[min_position], &buf);
+          sposition[min_position] = sposition[min_position] + 1;
+          if ((blk = readBlockFromDisk(sposition[min_position], &buf)) == NULL)
+          {
+            perror("Reading Block Failed!\n");
+            return -1;
+          }
+          sort_blks[min_position] = blk;
+          read_tuple(blk, 1);
+          write_tuple(compare_blk, min_position);
+          sort_blks_i[min_position] = 2;
+        }
+      //否则Mi为空，置为特殊值FINISHED
+        else
+        {
+          tuple_value.x = FINISHED;
+          tuple_value.y = FINISHED;
+          write_tuple(compare_blk, min_position);
+        }
+      }
     }
     else
     {
-      // Si有下一块
-      if ((sposition[min_position] - (rstart-1)) % (buf.numAllBlk - 1) != 0 && sposition[min_position] != rfinish)
-      {
-        freeBlockInBuffer(sort_blks[min_position], &buf);
-        sposition[min_position] = sposition[min_position] + 1;
-        if ((blk = readBlockFromDisk(sposition[min_position], &buf)) == NULL)
-        {
-          perror("Reading Block Failed!\n");
-          return -1;
-        }
-        sort_blks[min_position] = blk;
-        read_tuple(blk, 1);
-        write_tuple(compare_blk, min_position);
-        sort_blks_i[min_position] = 2;
-        goto STEP7;
-      }
-    //否则Mi为空，置为特殊值FINISHED
-      else
-      {
-        tuple_value.x = FINISHED;
-        tuple_value.y = FINISHED;
-        write_tuple(compare_blk, min_position);
-        goto STEP7;
-      }
+      break;
     }
   }
   freeBuffer(&buf);
