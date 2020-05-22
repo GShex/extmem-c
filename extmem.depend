@@ -58,7 +58,7 @@
 	<stdio.h>
 	"extmem.h"
 
-1589861638 source:d:\onedrive - stu.hit.edu.cn\code_c\extmem-c\extmem.c
+1590164515 source:d:\onedrive - stu.hit.edu.cn\code_c\extmem-c\extmem.c
 	<stdlib.h>
 	<stdio.h>
 	<string.h>
@@ -66,13 +66,11 @@
 
 1308709046 d:\onedrive - stu.hit.edu.cn\code_c\extmem-c\extmem.h
 
-1589863655 source:d:\onedrive - stu.hit.edu.cn\code_c\extmem-c\test.c
-	<stdlib.h>
-	<stdio.h>
-	"extmem.h"
+1590164902 source:d:\onedrive - stu.hit.edu.cn\code_c\extmem-c\test.c
 
-1589863318 source:d:\onedrive - stu.hit.edu.cn\code_c\extmem-c\mypro.c
+1590164782 source:d:\onedrive - stu.hit.edu.cn\code_c\extmem-c\mypro.c
 	<stdlib.h>
 	<stdio.h>
+	<string.h>
 	"extmem.h"
 
