@@ -41,8 +41,8 @@ int main(int argc, char **argv)
   // index_select(317, 348, 517, 0, 617, 0);
 
   // relation_projection(301, 316, 701);
-  sort_merge_join(301, 316, 317, 348, 1000);
-  getchar();
+  // sort_merge_join(301, 316, 317, 348, 1000);
+  // getchar();
   return 0;
 }
 
@@ -431,6 +431,8 @@ int relation_projection(int sort_start, int sort_finish, int result_start)
   int wblk_index = 1;
   int result_finish = result_start;
   int count = 0;
+  int two_in_one = 0;
+  int last_value = 0;
   wblk = getNewBlockInBuffer_clear(&buf);
 
   m = (sort_finish - sort_start) / (buf.numAllBlk - 1) + 1;
@@ -456,12 +458,14 @@ int relation_projection(int sort_start, int sort_finish, int result_start)
     {
       printf("读入数据块%d\n", sort_start - blk_index);
       read_tuple(blks[0], 1);
+      last_value = tuple_value.x;
       temp = tuple_value.x;
       tuple_value.y = 0;
       write_tuple(wblk, wblk_index);
       printf("(X=%d)\n", temp);
-      wblk_index++;
+      // wblk_index++;
       count++;
+      two_in_one = 1;
     }
     for (int j = 0; j < blk_index; j++)
     {
@@ -477,11 +481,26 @@ int relation_projection(int sort_start, int sort_finish, int result_start)
         if(temp != tuple_value.x)
         {
           count++;
-          temp = tuple_value.x;
-          tuple_value.y = 0;
-          write_tuple(wblk, wblk_index);
-          printf("(X=%d)\n", temp);
-          wblk_index++;
+          if(two_in_one == 0)
+          {
+            last_value = tuple_value.x;
+            temp = tuple_value.x;
+            tuple_value.y = 0;
+            write_tuple(wblk, wblk_index);
+            printf("(X=%d)\n", temp);
+            two_in_one = 1;
+          }
+          else
+          {
+            temp = tuple_value.x;
+            tuple_value.y = tuple_value.x;
+            tuple_value.x = last_value;
+            write_tuple(wblk, wblk_index);
+            printf("(X=%d)\n", temp);
+            two_in_one = 0;
+            wblk_index++;
+          }
+
           if(wblk_index == 8)
           {
             tuple_value.x = result_finish + 1;
@@ -541,21 +560,32 @@ int sort_merge_join(int R_sort_start, int R_sort_finish, int S_sort_start, int S
   unsigned char *blk_R;
   unsigned char *blk_S;
   unsigned char *wblk;
-
+  int ok = 0;
   int first = 1;
   int blk_R_number = R_sort_start;
   int blk_R_index = 1;
   int finish = 0;
   int last_value_S = 0;
-  int now_blk_R_number;
+  int now_blk_R_number = R_sort_start;
   int result_finish = result_start;
   int save_blk_R_number;
   int save_blk_R_index;
   T value_S;
   T value_R;
   int wblk_index = 1;
+  int j_blk_R_index = 1;
   //用于写的内存块
   wblk = getNewBlockInBuffer_clear(&buf);
+
+  if ((blk_R = readBlockFromDisk(now_blk_R_number, &buf)) == NULL)
+  {
+    perror("Reading R-Block Failed!\n");
+    return -1;
+  }
+  read_tuple(blk_R, 1);
+  value_R.x = tuple_value.x;
+  value_R.y = tuple_value.y;
+  freeBlockInBuffer(blk_R, &buf);
 
   for (; S_sort_start <= S_sort_finish;S_sort_start++)
   {
@@ -565,33 +595,59 @@ int sort_merge_join(int R_sort_start, int R_sort_finish, int S_sort_start, int S
       return -1;
     }
     //对S每一块的七个值
-    for (i = 1; i <= 7; i++)
+    for (int i = 1; i <= 7; i++)
     {
       read_tuple(blk_S, i);
+      value_S.x = tuple_value.x;
+      value_S.y = tuple_value.y;
       if(first == 1)
       {
         last_value_S = tuple_value.x;
         first = 0;
-      }
-      value_S.x = tuple_value.x;
-      value_S.y = tuple_value.y;
-      //最后一块可能有空白，读到的值为0就退出去即结束了
-      if(value_S.x != 0)
-      {
-        if(value_S.x == last_value_S)
-        {
-          now_blk_R_number = blk_R_number;
-          j_blk_R_index = blk_R_index;
-          while(now_blk_R_number<=R_sort_finish && value_R.x == value_S.x)
+         while (now_blk_R_number<=R_sort_finish && value_R.x < value_S.x)
           {
             if ((blk_R = readBlockFromDisk(now_blk_R_number, &buf)) == NULL)
             {
               perror("Reading R-Block Failed!\n");
               return -1;
             }
-            for (j = j_blk_R_index; j <= 7;j++)
+            for (; j_blk_R_index <= 7;j_blk_R_index++)
             {
-              read_tuple(blk_S, i);
+              read_tuple(blk_R, j_blk_R_index);
+              value_R.x = tuple_value.x;
+              value_R.y = tuple_value.y;
+              if(value_R.x >= value_S.x)
+              {
+                break;
+              }
+            }
+            blk_R_number = now_blk_R_number;
+            blk_R_index = j_blk_R_index;
+            // save_blk_R_number = now_blk_R_number;
+            // save_blk_R_index = j_blk_R_index;
+            now_blk_R_number++;
+            j_blk_R_index = 1;
+            freeBlockInBuffer(blk_R, &buf);
+          }
+      }
+
+      //最后一块可能有空白，读到的值为0就退出去即结束了
+      if(value_S.x != 0)
+      {
+        if(value_S.x == last_value_S)//第一次的处理
+        {
+          now_blk_R_number = blk_R_number;
+          j_blk_R_index = blk_R_index;
+          while (now_blk_R_number<=R_sort_finish && value_R.x == value_S.x)
+          {
+            if ((blk_R = readBlockFromDisk(now_blk_R_number, &buf)) == NULL)
+            {
+              perror("Reading R-Block Failed!\n");
+              return -1;
+            }
+            for (; j_blk_R_index <= 7;j_blk_R_index++)
+            {
+              read_tuple(blk_R, j_blk_R_index);
               value_R.x = tuple_value.x;
               value_R.y = tuple_value.y;
               if(value_R.x == value_S.x)
@@ -655,9 +711,9 @@ int sort_merge_join(int R_sort_start, int R_sort_finish, int S_sort_start, int S
               perror("Reading R-Block Failed!\n");
               return -1;
             }
-            for (j = j_blk_R_index; j <= 7;j++)
+            for (; j_blk_R_index <= 7;j_blk_R_index++)
             {
-              read_tuple(blk_S, i);
+              read_tuple(blk_R, j_blk_R_index);
               value_R.x = tuple_value.x;
               value_R.y = tuple_value.y;
               if(value_R.x >= value_S.x)
