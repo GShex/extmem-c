@@ -55,8 +55,7 @@ int linear_select()
 {
   printf("----------基于线性搜索的关系选择----------\n\n");
   Buffer buf;
-  // unsigned char *blk;
-  // unsigned char *wblk;
+
   int m = 1;
   int write_disk_num = 100;
 
@@ -68,63 +67,6 @@ int linear_select()
 
   linear_select_search(1, 16, 100, &buf);
 
-  // wblk = getNewBlockInBuffer_clear(&buf);
-
-  // for (int i = 1; i <= 16; i++)
-  // {
-  //   if ((blk = readBlockFromDisk(i, &buf)) == NULL)
-  //   {
-  //     perror("Reading Block Failed!\n");
-  //     return -1;
-  //   }
-  //   else
-  //   {
-  //     printf("读入数据块%d\n", i);
-
-  //     for (int j = 1; j <= 7;j++)
-  //     {
-  //       read_tuple(blk, j);
-  //       // printf("%d, %d\n", tuple_value.x, tuple_value.y);
-  //       if(tuple_value.x == 30)
-  //       {
-  //         //一个内存块存满了，先把他写入磁盘
-  //         if(m > 7)
-  //         {
-  //           m = 1;
-  //           tuple_value.x = write_disk_num + 1;
-  //           tuple_value.y = 0;
-  //           write_tuple(wblk, 8);
-  //           if (writeBlockToDisk(wblk, write_disk_num, &buf) != 0)
-  //           {
-  //             perror("Writing Block Failed!\n");
-  //             return -1;
-  //           }
-  //           printf("注：结果写入磁盘%d\n", write_disk_num);
-  //           write_disk_num++;
-  //           // freeBlockInBuffer(wblk, &buf);
-  //           wblk = getNewBlockInBuffer_clear(&buf);
-  //         }
-  //         printf("(X=%d, Y=%d)\n", tuple_value.x, tuple_value.y);
-  //         write_tuple(wblk, m);
-  //         m++;
-  //       }
-  //     }
-  //     freeBlockInBuffer(blk, &buf);
-  //   }
-  // }
-  // //结果写入磁盘
-  // tuple_value.x = write_disk_num + 1;
-  // tuple_value.y = 0;
-  // write_tuple(wblk, 8);
-  // if (writeBlockToDisk(wblk, write_disk_num, &buf) != 0)
-  // {
-  //   perror("Writing Block Failed!\n");
-  //   return -1;
-  // }
-  // printf("注：结果写入磁盘%d\n", write_disk_num);
-  // // freeBlockInBuffer(wblk, &buf);
-  // printf("共发生%d次I/O\n", buf.numIO);
-  //释放内存
   freeBuffer(&buf);
 }
 
