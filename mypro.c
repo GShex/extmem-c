@@ -28,6 +28,7 @@ int cmp(const void *a, const void *b);
 
 int find_min_position(unsigned char *blk);
 int create_index(int rstart, int rfinish, int index_start, Buffer *buf);
+int select_sort_in_buf(int start_blk, int finish_blk, Buffer *buf);
 
 unsigned char *getNewBlockInBuffer_clear(Buffer *buf);
 int linear_select_search(int search_start, int search_finish, int wfinish, Buffer *buf);
@@ -38,6 +39,7 @@ int main(int argc, char **argv)
 {
   // printf("hello world\n");
   // linear_select();
+  tpmms(1,16,301);
   // tpmms(17,48,317);
   // index_select(301, 316, 501, 0, 601, 1);
   // index_select(317, 348, 517, 0, 617, 0);
@@ -46,7 +48,7 @@ int main(int argc, char **argv)
   // sort_merge_join(301, 316, 317, 348, 1001);
   // two_scan_and(301, 316, 317, 348, 2001);
   // two_scan_or(301, 316, 317, 348, 3001);
-  two_scan_minus(301, 316, 317, 348, 4001);
+  // two_scan_minus(301, 316, 317, 348, 4001);
   getchar();
   return 0;
 }
@@ -89,75 +91,78 @@ int tpmms(int rstart, int rfinish, int wstart)
     return -1;
   }
 
-  unsigned char *(blks[buf.numAllBlk]);
+
+  //第一趟进行内排序，满足在buffer中排序的要求
+  select_sort_in_buf(rstart, rfinish, &buf);
 
   int m = (rfinish - rstart) / (buf.numAllBlk - 1) + 1;//划分为m个子集合  这里是7个一组，内存为8，满足7<8
-  for (int i = 1; i <= m; i++)
-  {
-    index_tuples = 0;
-    index_blks = 0;
-    sstart = temp;
-    temp = sstart + buf.numAllBlk - 1 - 1;
-    sfinish = temp < rfinish ? temp : rfinish;
 
-    temp_start = sstart;
-    temp_finish = sfinish;
-    //首先全放到内存中
-    for (int k = 0; k <= SUMTUPLE;k++)
-    {
-      tuples[k].x = 9999;
-      tuples[k].y = 9999;
-    }
-    for (; sstart <= sfinish; sstart++)
-    {
-      if ((blk = readBlockFromDisk(sstart, &buf)) == NULL)
-      {
-        perror("Reading Block Failed!\n");
-        return -1;
-      }
-      blks[index_blks] = blk;
-      for (int j = 0; j < 7; j++)
-      {
-        read_tuple(blk, j + 1);
-        tuples[index_tuples].x = tuple_value.x;
-        tuples[index_tuples].y = tuple_value.y;
-        index_tuples++;
-      }
-      index_blks++;
-    }
+  // unsigned char *(blks[buf.numAllBlk]);
+  // for (int i = 1; i <= m; i++)
+  // {
+  //   index_tuples = 0;
+  //   index_blks = 0;
+  //   sstart = temp;
+  //   temp = sstart + buf.numAllBlk - 1 - 1;
+  //   sfinish = temp < rfinish ? temp : rfinish;
 
-    //进行内排序
-    qsort(tuples, index_tuples, sizeof(tuples[0]), cmp);
+  //   temp_start = sstart;
+  //   temp_finish = sfinish;
+  //   //首先全放到内存中
+  //   for (int k = 0; k <= SUMTUPLE;k++)
+  //   {
+  //     tuples[k].x = 9999;
+  //     tuples[k].y = 9999;
+  //   }
+  //   for (; sstart <= sfinish; sstart++)
+  //   {
+  //     if ((blk = readBlockFromDisk(sstart, &buf)) == NULL)
+  //     {
+  //       perror("Reading Block Failed!\n");
+  //       return -1;
+  //     }
+  //     blks[index_blks] = blk;
+  //     for (int j = 0; j < 7; j++)
+  //     {
+  //       read_tuple(blk, j + 1);
+  //       tuples[index_tuples].x = tuple_value.x;
+  //       tuples[index_tuples].y = tuple_value.y;
+  //       index_tuples++;
+  //     }
+  //     index_blks++;
+  //   }
 
-    //写回磁盘
-    temp = sstart;
-    sstart = temp_start;
-    sfinish = temp_finish;
+  //   //进行内排序
+  //   qsort(tuples, index_tuples, sizeof(tuples[0]), cmp);
 
-    index_tuples = 0;
-    for (int i = 0; i < index_blks; i++)
-    {
-      blk = blks[i];
-      for (int j = 0; j < 7; j++)
-      {
-        tuple_value.x = tuples[index_tuples].x;
-        tuple_value.y = tuples[index_tuples].y;
-        write_tuple(blk, j+1);
-        index_tuples++;
-      }
-      tuple_value.x = sstart + 1;
-      tuple_value.y = 0;
-      write_tuple(blk, 8);
-      if (writeBlockToDisk(blk, sstart, &buf) != 0)
-      {
-        perror("Writing Block Failed!\n");
-        return -1;
-      }
-      // freeBlockInBuffer(blk, &buf);
-      sstart++;
-    }
-  }
+  //   //写回磁盘
+  //   temp = sstart;
+  //   sstart = temp_start;
+  //   sfinish = temp_finish;
 
+  //   index_tuples = 0;
+  //   for (int i = 0; i < index_blks; i++)
+  //   {
+  //     blk = blks[i];
+  //     for (int j = 0; j < 7; j++)
+  //     {
+  //       tuple_value.x = tuples[index_tuples].x;
+  //       tuple_value.y = tuples[index_tuples].y;
+  //       write_tuple(blk, j+1);
+  //       index_tuples++;
+  //     }
+  //     tuple_value.x = sstart + 1;
+  //     tuple_value.y = 0;
+  //     write_tuple(blk, 8);
+  //     if (writeBlockToDisk(blk, sstart, &buf) != 0)
+  //     {
+  //       perror("Writing Block Failed!\n");
+  //       return -1;
+  //     }
+  //     // freeBlockInBuffer(blk, &buf);
+  //     sstart++;
+  //   }
+  // }
 
   //----------以下开始归并排序-----------
   unsigned char *compare_blk;
@@ -207,6 +212,7 @@ int tpmms(int rstart, int rfinish, int wstart)
       p_output++;
       if(p_output == 8)
       {
+        printf("注：结果写入磁盘%d\n", wstart);
         tuple_value.x = wstart + 1;
         tuple_value.y = 0;
         write_tuple(output_blk, 8);
@@ -832,7 +838,7 @@ int two_scan_and(int R_sort_start, int R_sort_finish, int S_sort_start, int S_so
       value_S.y = tuple_value.y;
       value_S.x = value_S.x;
 
-      //第一次找R的值
+      //第一次找R的值，向后推R直到R>=S
       if(first == 1)
       {
         find = 0;
@@ -909,6 +915,7 @@ int two_scan_and(int R_sort_start, int R_sort_finish, int S_sort_start, int S_so
           read_tuple(blk_R, j_blk_R_index);
           value_R.x = tuple_value.x;
           value_R.y = tuple_value.y;
+          //找交的，即x和y都相同，利用哈希表去重
           if(value_R.x == value_S.x && value_R.y == value_S.y && remeber_hash[value_S.x][value_S.y] == 0)
           {
             remeber_hash[value_S.x][value_S.y] = 1;
@@ -1210,6 +1217,7 @@ int two_scan_or(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sor
           read_tuple(blk_R, j_blk_R_index);
           value_R.x = tuple_value.x;
           value_R.y = tuple_value.y;
+          //找并的，只要没写过就往里写，利用哈希表去重
           if(remeber_hash[value_R.x][value_R.y] == 0)
           {
             remeber_hash[value_R.x][value_R.y] = 1;
@@ -1491,6 +1499,7 @@ int two_scan_minus(int R_sort_start, int R_sort_finish, int S_sort_start, int S_
           read_tuple(blk_R, j_blk_R_index);
           value_R.x = tuple_value.x;
           value_R.y = tuple_value.y;
+          //找差的，原来1代表S中有，如果R中也有就清0，即可实现S-R
           if(value_R.x == value_S.x && value_R.y == value_S.y && remeber_hash[value_S.x][value_S.y] == 1)
           {
             remeber_hash[value_S.x][value_S.y] = 0;
@@ -1847,3 +1856,73 @@ int linear_select_search(int search_start, int search_finish, int wfinish, Buffe
 
   return 0;
 }
+
+
+int select_sort_in_buf(int start_blk, int finish_blk, Buffer *buf) 
+{
+
+    int blk_num = finish_blk - start_blk + 1;         //磁盘块数量
+
+    int m = (finish_blk - start_blk) / (buf->numAllBlk - 1) + 1;//划分为m个子集合  这里是7个一组，内存为8，满足7<8
+
+    int now_blk = start_blk;                       //当前磁盘块
+    int blk_cnt = 0;
+    unsigned char *blk;
+    unsigned char *blks[buf->numAllBlk - 1];
+    int sstart = start_blk;
+    T t1, t2;
+
+    //按组遍历
+    for (int i = 0; i < m; i++) 
+    {
+        blk_cnt = 0;
+        for (; blk_cnt < (buf->numAllBlk - 1) && now_blk <= finish_blk; now_blk++, blk_cnt++) {
+            if ((blks[blk_cnt] = readBlockFromDisk(now_blk, buf)) == NULL) {
+                perror("Reading Block Failed!\n");
+                exit(-1);
+            }
+        }
+        //内排序
+        for (int j = 0; j < blk_cnt * 7 - 1; j++) {
+            int tuple_j_index = j / 7;
+            int tuple_j_offset = j % 7 + 1;
+            for (int k = j + 1; k < blk_cnt * 7; k++) {
+                int tuple_k_index = k / 7;
+                int tuple_k_offset = k % 7 + 1;
+                read_tuple(blks[tuple_j_index], tuple_j_offset);
+                t1.x = tuple_value.x;
+                t1.y = tuple_value.y;
+                read_tuple(blks[tuple_k_index], tuple_k_offset);
+                t2.x = tuple_value.x;
+                t2.y = tuple_value.y;
+
+                if (t1.x > t2.x) {
+                  tuple_value.x = t2.x;
+                  tuple_value.y = t2.y;
+                  write_tuple(blks[tuple_j_index], tuple_j_offset);
+                  tuple_value.x = t1.x;
+                  tuple_value.y = t1.y;
+                  write_tuple(blks[tuple_k_index], tuple_k_offset);
+                }
+            }
+
+        }
+
+
+        for (int i = 0; i < blk_cnt; i++)
+        {
+          blk = blks[i];
+          tuple_value.x = sstart + 1;
+          tuple_value.y = 0;
+          write_tuple(blk, 8);
+          if (writeBlockToDisk(blk, sstart, buf) != 0)
+          {
+            perror("Writing Block Failed!\n");
+            return -1;
+          }
+          sstart++;
+      
+    }
+  }
+}
+
