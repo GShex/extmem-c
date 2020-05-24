@@ -63,13 +63,13 @@ int two_scan_or(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sor
 int two_scan_minus(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sort_finish, int result_start);
 
 //===================================================
-//功能：读取一个元祖
+//功能：读取一个元组
 //输入参数：blk，序号
 //===================================================
 int read_tuple(unsigned char *blk, int num);
 
 //===================================================
-//功能：写入一个元祖
+//功能：写入一个元组
 //输入参数：blk，序号
 //===================================================
 void write_tuple(unsigned char *blk, int num);
