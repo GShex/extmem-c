@@ -1967,24 +1967,17 @@ int select_sort_in_buf(int start_blk, int finish_blk, Buffer *buf)
                 int tuple_k_index = k / 7;
                 int tuple_k_offset = k % 7 + 1;
                 read_tuple(blks[tuple_j_index], tuple_j_offset);
-                t1.x = tuple_value.x;
-                t1.y = tuple_value.y;
+                t1 = tuple_value;
                 read_tuple(blks[tuple_k_index], tuple_k_offset);
-                t2.x = tuple_value.x;
-                t2.y = tuple_value.y;
-
+                t2 = tuple_value;
                 if (t1.x > t2.x) {
-                  tuple_value.x = t2.x;
-                  tuple_value.y = t2.y;
+                  tuple_value = t2;
                   write_tuple(blks[tuple_j_index], tuple_j_offset);
-                  tuple_value.x = t1.x;
-                  tuple_value.y = t1.y;
+                  tuple_value = t1;
                   write_tuple(blks[tuple_k_index], tuple_k_offset);
                 }
             }
-
         }
-
 
         for (int i = 0; i < blk_cnt; i++)
         {
