@@ -4,7 +4,6 @@
 #include "extmem.h"
 
 #define BLKSIZE 64
-#define SUMTUPLE 49
 #define FINISHED 9999
 
 typedef struct tuple
@@ -13,24 +12,103 @@ typedef struct tuple
   int y;
 }T;
 
+//===================================================
+//功能：线性搜索的入口函数，实际调用linear_select_search
+//输入参数：无，搜索R.A == 30
+//===================================================
 int linear_select();
+
+//===================================================
+//功能：tpmms
+//输入参数：关系起始blk，结束blk，写入起始地址
+//===================================================
 int tpmms(int rstart, int rfinish, int wstart);
+
+//===================================================
+//功能：基于索引的关系选择，基于tpmms的排序结果
+//输入参数：排序好的blk起始，blk结束，保存索引blk的起始，是否已有索引，以及一个标记变量：是否search
+//index_finish = 为0时直接读入index_start索引文件不再建立索引，否则以index_start为起始地址建立索引
+//search：为1会搜索R.A == 30，如果只是为了给B建立索引，此位置0
+//===================================================
 int index_select(int rstart, int rfinish, int index_start, int index_finish, int result_start, int search);
+
+//===================================================
+//功能：关系投影算法
+//输入参数：排序好的blk起始，blk结束，保存结果的blk起始
+//===================================================
 int relation_projection(int sort_start, int sort_finish, int result_start);
+
+//===================================================
+//功能：基于排序的连接操作
+//输入参数：排序好的R的blk起始，R的blk结束，排序好的S的blk起始，S的blk结束，结果写入起始blk
+//===================================================
 int sort_merge_join(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sort_finish, int result_start);
+
+//===================================================
+//功能：集合操作算法————交
+//输入参数：排序好的R的blk起始，R的blk结束，排序好的S的blk起始，S的blk结束，结果写入起始blk
+//===================================================
 int two_scan_and(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sort_finish, int result_start);
+
+//===================================================
+//功能：集合操作算法————并
+//输入参数：排序好的R的blk起始，R的blk结束，排序好的S的blk起始，S的blk结束，结果写入起始blk
+//===================================================
 int two_scan_or(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sort_finish, int result_start);
+
+//===================================================
+//功能：集合操作算法————差
+//输入参数：排序好的R的blk起始，R的blk结束，排序好的S的blk起始，S的blk结束，结果写入起始blk
+//===================================================
 int two_scan_minus(int R_sort_start, int R_sort_finish, int S_sort_start, int S_sort_finish, int result_start);
+
+//===================================================
+//功能：读取一个元祖
+//输入参数：blk，序号
+//===================================================
 int read_tuple(unsigned char *blk, int num);
+
+//===================================================
+//功能：写入一个元祖
+//输入参数：blk，序号
+//===================================================
 void write_tuple(unsigned char *blk, int num);
 
+//===================================================
+//功能：用于qsort的cmp，由于后期移除了qsort改为自己在buffer中排序，实际并未用到
+//===================================================
 int cmp(const void *a, const void *b);
 
+//===================================================
+//功能：tpmms中寻找blk中的最小值
+//输入参数：blk
+//===================================================
 int find_min_position(unsigned char *blk);
+
+//===================================================
+//功能：基于索引的关系选择算法中的创建索引部分
+//输入参数：排序号的blk起始，blk结束，保存的blk起始，buffer
+//===================================================
 int create_index(int rstart, int rfinish, int index_start, Buffer *buf);
+
+//===================================================
+//功能：用于tpmms的内排序
+//输入参数：起始blk，结束blk，buffer
+//===================================================
 int select_sort_in_buf(int start_blk, int finish_blk, Buffer *buf);
 
+//===================================================
+//功能：获得一个内容全置0的blk
+//输入参数：buffer
+//返回值：blk指针
+//===================================================
 unsigned char *getNewBlockInBuffer_clear(Buffer *buf);
+
+//===================================================
+//功能：实际的线性搜索关系选择方法实现，因为基于索引的选择也要用，所以单独成函数
+//输入参数：搜索起始blk，搜索结束blk，写入起始blk，buffer
+//这里虽然写作wfinish实际应为wstart
+//===================================================
 int linear_select_search(int search_start, int search_finish, int wfinish, Buffer *buf);
 
 T tuple_value;
@@ -77,7 +155,6 @@ int tpmms(int rstart, int rfinish, int wstart)
   printf("----------两阶段多路归并排序----------\n\n");
   Buffer buf;
   unsigned char *blk;
-  T tuples[SUMTUPLE];
   int sstart, sfinish;
   int temp = rstart;
   int temp_start = rstart;
