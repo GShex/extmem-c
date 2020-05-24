@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 {
   // printf("hello world\n");
   // linear_select();
-  tpmms(1,16,301);
+  // tpmms(1,16,301);
   // tpmms(17,48,317);
   // index_select(301, 316, 501, 0, 601, 1);
   // index_select(317, 348, 517, 0, 617, 0);
@@ -126,7 +126,7 @@ int main(int argc, char **argv)
   // sort_merge_join(301, 316, 317, 348, 1001);
   // two_scan_and(301, 316, 317, 348, 2001);
   // two_scan_or(301, 316, 317, 348, 3001);
-  // two_scan_minus(301, 316, 317, 348, 4001);
+  two_scan_minus(301, 316, 317, 348, 4001);
   getchar();
   return 0;
 }
