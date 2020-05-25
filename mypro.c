@@ -122,11 +122,11 @@ int main(int argc, char **argv)
   // index_select(301, 316, 501, 0, 601, 1);
   // index_select(317, 348, 517, 0, 617, 0);
 
-  // relation_projection(301, 316, 701);
+  relation_projection(301, 316, 701);
   // sort_merge_join(301, 316, 317, 348, 1001);
   // two_scan_and(301, 316, 317, 348, 2001);
   // two_scan_or(301, 316, 317, 348, 3001);
-  two_scan_minus(301, 316, 317, 348, 4001);
+  // two_scan_minus(301, 316, 317, 348, 4001);
   getchar();
   return 0;
 }
@@ -463,6 +463,7 @@ int relation_projection(int sort_start, int sort_finish, int result_start)
   int count = 0;
   int two_in_one = 0;
   int last_value = 0;
+  int now_blk = sort_start;
   wblk = getNewBlockInBuffer_clear(&buf);
 
   m = (sort_finish - sort_start) / (buf.numAllBlk - 1) + 1;
@@ -493,6 +494,7 @@ int relation_projection(int sort_start, int sort_finish, int result_start)
       tuple_value.y = 0;
       write_tuple(wblk, wblk_index);
       printf("(X=%d)\n", temp);
+      now_blk++;
       // wblk_index++;
       count++;
       two_in_one = 1;
@@ -502,7 +504,8 @@ int relation_projection(int sort_start, int sort_finish, int result_start)
       //一块写7个
       if(first_read == 0)
       {
-        printf("读入数据块%d\n", sort_start + j - blk_index);
+        printf("读入数据块%d\n", now_blk);
+        now_blk++;
       }
       first_read = 0;
       for (int k = 0; k < 7; k++)
